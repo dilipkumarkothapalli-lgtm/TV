@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KDK MUSIC - LIVE TV</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Mukta:wght@700;800;900&display=swap');
+        :root { --p: #ff007f; --s: #300066; --a: #00f0ff; }
+        
+        body { margin: 0; padding: 0; background: #050505; color: #fff; font-family: 'Mukta', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; width: 100vw; overflow: hidden; }
+        .tv-screen { position: relative; background: #000; overflow: hidden; width: 100vw; height: 100vh; }
+        #yt-wrap { position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; background: #000;}
+        #yt-wrap iframe { position: absolute; top: 50%; left: 50%; width: 100%; height: 100%; border: none; transform: translate(-50%, -50%); pointer-events: none; }
+        
+        .top-right-bug { position: absolute; top: 5%; right: 5%; z-index: 10; display: flex; flex-direction: column; align-items: flex-end; }
+        .logo-box { width: 15vw; max-width: 130px; filter: drop-shadow(0 1vh 1.5vh rgba(0,0,0,0.9)) saturate(1.2); }
+        .logo-box img { width: 100%; object-fit: contain; }
+        .program-title-sub { color: #fff; font-size: 2.2vh; font-weight: 800; text-shadow: 0.2vh 0.2vh 0.5vh #000, 0 0 1vh rgba(0,0,0,0.9); text-transform: uppercase; text-align: right; margin-top: 0.5vh; max-width: 35vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .sm-banner-container { position: absolute; bottom: 5%; left: 5%; z-index: 20; display: flex; flex-direction: column; pointer-events: none; }
+        .sm-row { display: flex; align-items: stretch; filter: drop-shadow(0 1vh 1.5vh rgba(0,0,0,0.9)); }
+        .sm-red { background: linear-gradient(135deg, var(--p), #880044); color: #fff; font-weight: 900; font-size: 2vh; padding: 0.8vh 1.5vw; border-radius: 0.5vh 0 0 0.5vh; border-left: 0.4vh solid var(--a); display: flex; align-items: center; justify-content: center; text-transform: uppercase; }
+        .sm-dark { background: rgba(15, 15, 15, 0.85); backdrop-filter: blur(10px); color: #fff; font-size: 2.6vh; font-weight: 800; padding: 0.8vh 3vw 0.8vh 1.5vw; border-radius: 0 0.5vh 0.5vh 0; border-bottom: 0.3vh solid var(--a); display: flex; align-items: center; text-transform: uppercase; }
+
+        .dynamic-promo { position: absolute; right: -100%; top: 15%; width: 260px; background: rgba(20, 0, 30, 0.5); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.1); border-left: 0.4vh solid var(--a); box-shadow: -1vh 0 3vh rgba(0,0,0,0.9); z-index: 40; border-radius: 1vh 0 0 1vh; transition: right 0.8s cubic-bezier(0.25, 1, 0.5, 1); display: flex; flex-direction: column; overflow: hidden; }
+        .dynamic-promo.active { right: 0; }
+        .promo-poster { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-bottom: 0.3vh solid var(--p); background: #000; }
+        .promo-info { padding: 1.5vh; display: flex; flex-direction: column; align-items: center; text-align: center; }
+        .promo-lbl { background: var(--p); color: #fff; font-size: 1.4vh; font-weight: 900; padding: 0.3vh 1.2vw; border-radius: 2vh; text-transform: uppercase; margin-bottom: 0.8vh; }
+        .promo-time { color: var(--a); font-weight: 900; font-size: 2.4vh; text-shadow: 0 0.2vh 0.5vh #000; }
+        .promo-title { color: #fff; font-size: 1.8vh; font-weight: 800; text-transform: uppercase; margin-top: 0.5vh; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+        .network-ad-container { position: absolute; bottom: -100%; left: 0; width: 100%; background: rgba(0,0,0,0.95); backdrop-filter: blur(15px); z-index: 80; border-top: 0.4vh solid var(--p); display: flex; flex-direction: column; align-items: center; padding: 2vh 0; transition: bottom 1s cubic-bezier(0.25, 1, 0.5, 1); pointer-events: none; }
+        .network-ad-container.active { bottom: 0; }
+        .net-ad-title { color: #fff; font-size: 2.5vh; font-weight: 900; text-transform: uppercase; margin-bottom: 1.5vh; text-shadow: 0 0 1.5vh var(--p); }
+        .net-logos { display: flex; gap: 3vw; align-items: center; justify-content: center; width: 90%; }
+        .net-logo-item { width: 10vw; max-width: 75px; filter: drop-shadow(0 0 1vh rgba(255,255,255,0.2)); animation: floatLogo 3s ease-in-out infinite; }
+        .net-logo-item img { width: 100%; object-fit: contain; }
+        @keyframes floatLogo { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1vh); } }
+
+        #mute-cover { position: absolute; inset: 0; z-index: 999; background: radial-gradient(circle, var(--s), #000); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-direction: column; gap: 4vh; }
+        .play-btn { background: linear-gradient(90deg, var(--p), var(--a)); color: #fff; font-size: 3vh; font-weight: 900; padding: 1.5vh 4vw; border-radius: 5vh; text-transform: uppercase; border: none; cursor: pointer; box-shadow: 0 0 3vh var(--p); font-family: 'Mukta', sans-serif; }
+        .logo-reveal-screen { position: absolute; inset: 0; background: radial-gradient(circle, var(--s), #000); z-index: 100; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.5s ease; }
+        .logo-reveal-screen.active { opacity: 1; pointer-events: auto; }
+        .logo-reveal-screen img { width: 25%; min-width: 200px; filter: drop-shadow(0 0 4vh var(--p)); animation: starMaaZoom 4s forwards; }
+        @keyframes starMaaZoom { 0% { transform: scale(0.2); opacity: 0;} 20% { opacity: 1; transform: scale(1.1); } 80% { opacity: 1; transform: scale(1); } 100% { transform: scale(2.5); opacity: 0; } }
+    </style>
+</head>
+<body>
+    <div class="tv-screen">
+        <div id="yt-wrap"><div id="youtube-player"></div></div>
+        
+        <div id="mute-cover" onclick="startChannel()">
+            <img src="https://i.ibb.co/cjxYmPM/MUSIC-2-Photoroom.png" style="width: 200px; filter: drop-shadow(0 0 2vh #ff007f);">
+            <button class="play-btn">▶ Start Live Broadcast</button>
+        </div>
+
+        <div class="top-right-bug">
+            <div class="logo-box"><img src="https://i.ibb.co/cjxYmPM/MUSIC-2-Photoroom.png" alt="MUSIC"></div>
+            <div class="program-title-sub" id="telugu-title">Loading...</div>
+        </div>
+
+        <div class="dynamic-promo" id="dynamic-promo">
+            <img src="" id="promo-poster" class="promo-poster">
+            <div class="promo-info">
+                <div class="promo-lbl">UP NEXT</div>
+                <div class="promo-time" id="promo-time">--:--</div>
+                <div class="promo-title" id="promo-title">Loading...</div>
+            </div>
+        </div>
+
+        <div class="sm-banner-container">
+            <div class="sm-row"><div class="sm-red">NOW PLAYING</div><div class="sm-dark" id="b-now">Loading Data...</div></div>
+        </div>
+
+        <div class="network-ad-container" id="network-ad">
+            <div class="net-ad-title">Download KDK Entertainment App Now!</div>
+            <div class="net-logos">
+                <div class="net-logo-item"><img src="https://i.ibb.co/Pvc1YnbS/ENTERTAINMENT-Photoroom.png"></div>
+                <div class="net-logo-item"><img src="https://i.ibb.co/jPcGck69/KDK-MOVIES-2-Photoroom.png"></div>
+                <div class="net-logo-item"><img src="https://i.ibb.co/cjxYmPM/MUSIC-2-Photoroom.png"></div>
+                <div class="net-logo-item"><img src="https://i.ibb.co/d0wc3mgC/CARTOON-2-Photoroom.png"></div>
+                <div class="net-logo-item"><img src="https://i.ibb.co/4ZL3w0k1/SPORTS-2-Photoroom.png"></div>
+                <div class="net-logo-item"><img src="https://i.ibb.co/Gv0K99kf/NEWS-Photoroom.png"></div>
+            </div>
+        </div>
+
+        <div class="logo-reveal-screen" id="reveal-screen"><img src="https://i.ibb.co/cjxYmPM/MUSIC-2-Photoroom.png"></div>
+    </div>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        const CONFIG = { channel: 'music', sheetId: '1us5B2YGxTDy6i2ucwngRnEXpzM_J_6ngO1mWfnZVJ7M' };
+        let PLAYLIST = [], ytPlayer = null, channelStarted = false, isPlayerReady = false;
+        let currentIdx = -1, lastTrailer = null, isTrailer = false;
+
+        function t2s(str) { const p = String(str).split(":").map(Number); return p.length === 3 ? p[0]*3600 + p[1]*60 + p[2] : 0; }
+        function nSec() { const d = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })); return d.getHours()*3600 + d.getMinutes()*60 + d.getSeconds(); }
+        function ytId(url) { if (!url) return null; if (!url.includes("http")) return url; try { const u = new URL(url); if (u.hostname.includes("youtube.com")) { if (u.pathname.startsWith('/shorts/')) return u.pathname.split('/')[2]; return u.searchParams.get("v"); } if (u.hostname === "youtu.be") return u.pathname.slice(1).split("?")[0]; } catch {} return null; }
+
+        function onYouTubeIframeAPIReady() {
+            ytPlayer = new YT.Player('youtube-player', { 
+                playerVars: { 'autoplay': 1, 'controls': 0, 'rel': 0, 'modestbranding': 1, 'fs': 0, 'playsinline': 1, 'iv_load_policy': 3, 'disablekb': 1 }, 
+                events: { 'onReady': (e) => { isPlayerReady = true; e.target.mute(); setInterval(skipYouTubeAds, 1000); }, 'onStateChange': onPlayerStateChange } 
+            });
+        }
+
+        function skipYouTubeAds() {
+            if (!isPlayerReady || !ytPlayer || typeof ytPlayer.getDuration !== 'function') return;
+            try {
+                if (ytPlayer.getAdState && ytPlayer.getAdState() === 1) {
+                    ytPlayer.seekTo(ytPlayer.getDuration() - 1, true);
+                }
+            } catch (err) {}
+        }
+
+        function startChannel() {
+            document.getElementById('mute-cover').style.display = 'none'; channelStarted = true;
+            if (ytPlayer && isPlayerReady) { ytPlayer.unMute(); ytPlayer.setVolume(100); }
+            fetchSchedule(); 
+            setInterval(fetchSchedule, 10000); 
+            setInterval(playPromoSequence, 300000); 
+            setInterval(() => { const ad = document.getElementById('network-ad'); ad.classList.add('active'); setTimeout(() => ad.classList.remove('active'), 15000); }, 720000); 
+            setInterval(() => { const r = document.getElementById('reveal-screen'); r.classList.add('active'); setTimeout(() => r.classList.remove('active'), 4000); }, 900000); 
+        }
+
+        function playVideo(url, offsetSecs, isTrailerMode) {
+            if(!isPlayerReady) return;
+            const vid = ytId(url); if(!vid) return;
+            isTrailer = isTrailerMode;
+            ytPlayer.loadVideoById({ videoId: vid, startSeconds: Math.floor(Math.max(0, offsetSecs)) });
+        }
+
+        function onPlayerStateChange(e) {
+            if (e.data === YT.PlayerState.ENDED) { isTrailer = false; currentIdx = -1; fetchSchedule(); }
+        }
+
+        async function playPromoSequence() {
+            if(currentIdx === -1 || PLAYLIST.length === 0 || isTrailer) return;
+            const promoBox = document.getElementById('dynamic-promo');
+            let upNext = [];
+            for(let i = 1; i <= 3; i++) { if(currentIdx + i < PLAYLIST.length) upNext.push(PLAYLIST[currentIdx + i]); }
+            if(upNext.length === 0) return;
+            for(let i = 0; i < upNext.length; i++) {
+                let m = upNext[i];
+                const tp = m.streaming_time.split(':'); let hrs = parseInt(tp[0]); let ampm = hrs >= 12 ? 'PM' : 'AM'; hrs = hrs % 12; hrs = hrs ? hrs : 12;
+                let vid = ytId(m.url);
+                document.getElementById('promo-poster').src = (m.poster_url && m.poster_url.trim() !== '') ? m.poster_url : (vid ? `https://img.youtube.com/vi/${vid}/hqdefault.jpg` : 'https://i.ibb.co/cjxYmPM/MUSIC-2-Photoroom.png');
+                document.getElementById('promo-time').innerText = `${hrs}:${tp[1]} ${ampm}`;
+                document.getElementById('promo-title').innerText = m.title;
+                promoBox.classList.add('active'); await new Promise(r => setTimeout(r, 6000)); promoBox.classList.remove('active'); await new Promise(r => setTimeout(r, 1000));
+            }
+        }
+
+        function fetchSchedule() {
+            if(!channelStarted) return;
+            Papa.parse(`https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/gviz/tq?tqx=out:csv&sheet=Schedule`, {
+                download: true, header: true, complete: function(res) {
+                    PLAYLIST = res.data.filter(row => row.channel && row.channel.toLowerCase() === CONFIG.channel.toLowerCase() && row.streaming_time);
+                    if(PLAYLIST.length > 0) {
+                        const now = nSec(); let idx = -1; 
+                        for(let i=PLAYLIST.length-1; i>=0; i--) { if(t2s(PLAYLIST[i].streaming_time) <= now) { idx = i; break; } }
+                        
+                        if (idx !== -1 && idx + 1 < PLAYLIST.length) {
+                            const cs = t2s(PLAYLIST[idx].streaming_time); const ns = t2s(PLAYLIST[idx+1].streaming_time);
+                            const t2m = (cs + Math.floor((ns - cs) / 2)) - now;
+                            if(t2m > 0 && t2m <= 180 && lastTrailer !== PLAYLIST[idx+1].title && PLAYLIST[idx+1].trailer_id) {
+                                lastTrailer = PLAYLIST[idx+1].title;
+                                document.getElementById('b-now').innerText = "INTERVAL TRAILER"; document.getElementById('telugu-title').innerText = "PROMO";
+                                playVideo(PLAYLIST[idx+1].trailer_id, 0, true); return;
+                            }
+                        }
+
+                        if(idx !== -1 && !isTrailer) { 
+                            const expectedTime = Math.max(0, now - t2s(PLAYLIST[idx].streaming_time));
+                            if (currentIdx !== idx) {
+                                currentIdx = idx;
+                                document.getElementById('b-now').innerText = PLAYLIST[idx].title; document.getElementById('telugu-title').innerText = PLAYLIST[idx].title;
+                                playVideo(PLAYLIST[idx].url, expectedTime, false);
+                            } else if (ytPlayer && ytPlayer.getPlayerState() === 1) {
+                                if (Math.abs(expectedTime - ytPlayer.getCurrentTime()) > 10) ytPlayer.seekTo(expectedTime, true);
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

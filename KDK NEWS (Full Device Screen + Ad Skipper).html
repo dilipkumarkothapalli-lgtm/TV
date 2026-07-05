@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KDK NEWS - LIVE TV</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Telugu:wght@600;800;900&family=Roboto:wght@700;900&family=Bebas+Neue&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { width: 100vw; height: 100vh; background: #000; overflow: hidden; font-family: 'Noto Sans Telugu', sans-serif; margin: 0; padding: 0; }
+
+      /* RESPONSIVE FULL DEVICE SCREEN */
+      .tv-screen { position: relative; width: 100vw; height: 100vh; background: #000; overflow: hidden; }
+
+      /* Full-screen YouTube Engine */
+      #yt-wrap { position: absolute; inset: 0; z-index: 1; overflow: hidden; background: #000; pointer-events: none; }
+      #yt-wrap iframe { position: absolute; top: 50%; left: 50%; width: 100%; height: 100%; border: none; transform: translate(-50%, -50%); pointer-events: none; }
+      #tap-shield { position: absolute; inset: 0; z-index: 2; cursor: default; }
+      
+      /* Dark Gradient Vignette for TV screen look */
+      #vignette { position: absolute; inset: 0; z-index: 3; pointer-events: none; background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.5) 100%), linear-gradient(to bottom, rgba(0, 0, 0, 0.4) 0%, transparent 15%, transparent 70%, rgba(0, 0, 0, 0.8) 100%); }
+      
+      /* Invisible Mute Cover */
+      #mute-cover { position: absolute; inset: 0; z-index: 9999; cursor: pointer; display: none; }
+      
+      /* Loader */
+      #loader { position: absolute; inset: 0; z-index: 80; background: radial-gradient(circle, #001144 0%, #000000 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; transition: opacity 0.8s;}
+      #loader.out { opacity: 0; pointer-events: none; }
+      .load-logo-img { height: 120px; filter: drop-shadow(0 0 20px rgba(255,204,0,0.6)); animation: pulseLogo 1.5s infinite alternate;}
+      @keyframes pulseLogo { from{transform:scale(1);} to{transform:scale(1.05);} }
+      .load-bar-bg { width: 200px; height: 3px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; overflow: hidden; box-shadow: 0 0 10px rgba(0,0,0,0.5);}
+      .load-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #003399, #ffcc00, #cc0000); animation: lbar 2.8s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+      @keyframes lbar { 0% { width: 0%; } 100% { width: 100%; } }
+
+      /* KDK News UI Colors */
+      :root{--n-blue:#003399; --n-yellow:#ffcc00; --n-red:#cc0000;} 
+      
+      /* TOP TICKER - తాజా వార్తలు */
+      #news-top { position:absolute; top:0; left:0; width:100%; height:45px; display:flex; align-items:center; z-index:50; background: linear-gradient(90deg, var(--n-red), #880000); border-bottom:2px solid #fff; box-shadow:0 4px 15px rgba(0,0,0,0.8);}
+      .top-tab { background: linear-gradient(180deg, var(--n-yellow), #e6b800); color:#000; padding:0 30px; height:100%; font-size:24px; font-weight:900; display:flex; align-items:center; white-space:nowrap; clip-path:polygon(0 0, 100% 0, 92% 100%, 0 100%); z-index:2; box-shadow: 5px 0 10px rgba(0,0,0,0.5);}
+      .blink-dot { width: 10px; height: 10px; background: #cc0000; border-radius: 50%; margin-right: 10px; animation: blinker 1s linear infinite; }
+      @keyframes blinker { 50% { opacity: 0; } }
+      .top-scroll { flex:1; display:flex; align-items:center; overflow:hidden; padding-left:15px; height: 100%;}
+      
+      /* 10-Second Fade Text Animation for Top Ticker */
+      .fade-text { font-size:24px; font-weight:800; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; animation: fadeCycle 10s infinite; width: 100%; text-shadow: 1px 1px 2px #000;}
+      @keyframes fadeCycle { 0% { opacity: 0; transform: translateY(10px); } 5% { opacity: 1; transform: translateY(0); } 90% { opacity: 1; transform: translateY(0); } 95% { opacity: 0; transform: translateY(-10px); } 100% { opacity: 0; } }
+
+      /* TOP RIGHT LOGO & CLOCK */
+      #news-logo-box { position:absolute; top:0px; right:20px; z-index:60; display:flex; flex-direction: row; align-items:center; gap: 15px; background:rgba(255, 255, 255, 0.95); padding:5px 15px 10px 15px; border-bottom-left-radius: 20px; border-bottom-right-radius: 20px; box-shadow:0 5px 20px rgba(0,0,0,0.9); border: 2px solid #ccc; border-top: none;}
+      .logo-3d { height:75px; border: 3px solid var(--n-blue); border-radius: 50%; padding: 2px; background: #fff; filter:drop-shadow(0 4px 8px rgba(0,0,0,0.5)); animation: pulse 2s infinite alternate;}
+      @keyframes pulse { from{transform:scale(1);} to{transform:scale(1.05);} }
+      
+      .clock-box { background: linear-gradient(180deg, #111, #000); border: 2px solid var(--n-red); border-radius: 8px; padding: 6px 20px; display:flex; flex-direction:column; align-items:center; box-shadow: 0 5px 15px rgba(0,0,0,0.9);}
+      .d-date { color: var(--n-yellow); font-family:'Roboto',sans-serif; font-size: 14px; font-weight: 900; border-bottom: 1px solid #444; padding-bottom: 3px; margin-bottom: 3px;}
+      .d-time { color: #fff; font-family:'Roboto',sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 1px;}
+
+      /* FLASH NEWS SCREEN */
+      #flash-screen { position: absolute; inset: 0; z-index: 20; background: rgba(204, 0, 0, 0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.4s; backdrop-filter: blur(10px);}
+      #flash-screen.show { opacity: 1; }
+      .flash-banner { background: var(--n-yellow); color: var(--n-red); font-family: 'Bebas Neue', sans-serif; font-size: 120px; font-weight: 900; padding: 10px 80px; border: 8px solid #fff; box-shadow: 0 15px 50px rgba(0,0,0,0.9); animation: zoomInOut 0.8s infinite alternate; letter-spacing: 6px; line-height: 1; text-align: center; border-radius: 15px;}
+      .flash-headline { margin-top: 40px; font-size: 45px; color: #fff; font-weight: 900; text-align: center; max-width: 90%; text-shadow: 3px 3px 8px #000; line-height: 1.4;}
+      @keyframes zoomInOut { from { transform: scale(1); } to { transform: scale(1.03); } }
+
+      /* BOTTOM TICKERS LAYERED DESIGN */
+      #news-bottom { position:absolute; bottom:0; left:0; width:100%; z-index:50; display:flex; flex-direction:column; border-top:3px solid var(--n-red); background: #000; box-shadow: 0 -5px 25px rgba(0,0,0,0.9);}
+      
+      .w-row { display:flex; height:38px; background: linear-gradient(90deg, #001133, #000); border-bottom:1px solid #333;}
+      .w-tab { background: linear-gradient(180deg, #0088ff, #0055aa); color:#fff; padding:0 25px; font-size:18px; font-weight:800; display:flex; align-items:center; clip-path:polygon(0 0, 100% 0, 92% 100%, 0 100%); z-index:2; box-shadow: 3px 0 8px rgba(0,0,0,0.6);}
+      .w-scroll { flex:1; display:flex; align-items:center; color:#fff; font-family:'Roboto', sans-serif; font-size:17px; font-weight:700; padding:0 10px;}
+      .w-scroll span { color: var(--n-yellow); font-weight: 900; margin-left: 6px;}
+      .w-sep { margin: 0 12px; color: #555; }
+      
+      .m-row { display:flex; height:60px; background: linear-gradient(90deg, var(--n-blue), #001144); border-bottom:2px solid var(--n-yellow);}
+      .m-tab { background: linear-gradient(180deg, #ff3333, #cc0000); color:#fff; padding:0 35px; font-size:28px; font-weight:900; display:flex; align-items:center; border-right:3px solid #fff; min-width:220px; justify-content:center; box-shadow: 5px 0 15px rgba(0,0,0,0.7); z-index: 2; text-shadow: 2px 2px 4px #000;}
+      .m-scroll { flex:1; display:flex; align-items:center; padding:0 20px;}
+      .m-scroll marquee { font-size:30px; font-weight:800; color:var(--n-yellow); text-shadow: 2px 2px 4px #000; letter-spacing: 1px;}
+      
+      .l-row { display:flex; height:45px; background: #0a0a0a; }
+      .l-tab { background: linear-gradient(180deg, #ffea00, #e6b800); color:#000; padding:0 25px; font-size:22px; font-weight:900; display:flex; align-items:center; clip-path:polygon(0 0, 100% 0, 94% 100%, 0 100%); min-width:180px; z-index:2; box-shadow: 3px 0 8px rgba(0,0,0,0.6);}
+      .l-scroll { flex:1; display:flex; align-items:center; padding:0 15px;}
+      .l-scroll marquee { font-size:24px; font-weight:800; color:#fff; text-shadow: 1px 1px 2px #000;}
+    </style>
+  </head>
+  <body>
+    <div class="tv-screen">
+        <div id="yt-wrap"><div id="yt-player"></div></div>
+        <div id="tap-shield"></div>
+        <div id="vignette"></div>
+
+        <div id="loader">
+          <img src="https://i.ibb.co/Gv0K99kf/NEWS-Photoroom.png" alt="KDK News" class="load-logo-img" />
+          <div class="load-bar-bg"><div class="load-bar"></div></div>
+          <div style="color:#fff; font-family:'Roboto'; font-size: 14px; font-weight:bold; letter-spacing:3px; margin-top:5px; opacity: 0.8;">LIVE BROADCAST</div>
+        </div>
+
+        <div id="mute-cover"></div>
+
+        <div id="flash-screen">
+          <div class="flash-banner">FLASH NEWS</div>
+          <div class="flash-headline" id="flash-headline-text"></div>
+        </div>
+
+        <div id="news-top">
+          <div class="top-tab"><div class="blink-dot"></div>తాజా వార్తలు</div>
+          <div class="top-scroll">
+            <div id="google-news-text" class="fade-text">లోడింగ్ వార్తలు... దయచేసి వేచి ఉండండి...</div>
+          </div>
+        </div>
+
+        <div id="news-logo-box">
+          <img class="logo-3d" src="https://i.ibb.co/Gv0K99kf/NEWS-Photoroom.png" />
+          <div class="clock-box">
+            <div class="d-date" id="c-date">--/--/----</div>
+            <div class="d-time" id="c-time">--:--:--</div>
+          </div>
+        </div>
+
+        <div id="news-bottom">
+          <div class="w-row">
+            <div class="w-tab">వాతావరణం</div>
+            <div class="w-scroll">
+              <marquee scrollamount="5">
+                హైదరాబాద్ <span>30°C</span> <span class="w-sep">|</span> విశాఖపట్నం <span>32°C</span> <span class="w-sep">|</span> విజయవాడ <span>34°C</span> <span class="w-sep">|</span> అమరావతి <span>33°C</span> <span class="w-sep">|</span> తిరుపతి <span>31°C</span> <span class="w-sep">|</span> కర్నూలు <span>34°C</span> <span class="w-sep">|</span> వరంగల్ <span>32°C</span> <span class="w-sep">|</span> కరీంనగర్ <span>33°C</span> <span class="w-sep">|</span> నిజామాబాద్ <span>31°C</span> <span class="w-sep">|</span> ఖమ్మం <span>34°C</span> <span class="w-sep">|</span> కడప <span>34°C</span> <span class="w-sep">|</span> అనంతపురం <span>33°C</span> <span class="w-sep">|</span> గుంటూరు <span>33°C</span> <span class="w-sep">|</span> నెల్లూరు <span>31°C</span> <span class="w-sep">|</span> ఏలూరు <span>32°C</span> <span class="w-sep">|</span> ప్రకాశం <span>33°C</span> <span class="w-sep">|</span> శ్రీకాకుళం <span>31°C</span> <span class="w-sep">|</span> విజయనగరం <span>32°C</span> <span class="w-sep">|</span> నల్గొండ <span>34°C</span> <span class="w-sep">|</span> మహబూబ్ నగర్ <span>35°C</span> <span class="w-sep">|</span> న్యూఢిల్లీ <span>38°C</span> <span class="w-sep">|</span> ముంబై <span>29°C</span> <span class="w-sep">|</span> చెన్నై <span>35°C</span> <span class="w-sep">|</span> బెంగళూరు <span>28°C</span> <span class="w-sep">|</span> కోల్‌కతా <span>31°C</span> <span class="w-sep">|</span> అహ్మదాబాద్ <span>32°C</span> <span class="w-sep">|</span> లక్నో <span>36°C</span> <span class="w-sep">|</span> జైపూర్ <span>35°C</span>
+              </marquee>
+            </div>
+          </div>
+          <div class="m-row">
+            <div class="m-tab">ముఖ్య వార్తలు</div>
+            <div class="m-scroll"><marquee id="pop-desc" scrollamount="7">వార్తలు లోడ్ అవుతున్నాయి... లైవ్ అప్‌డేట్స్ కోసం చూస్తూ ఉండండి.</marquee></div>
+          </div>
+          <div class="l-row">
+            <div class="l-tab">లైవ్ అప్‌డేట్స్</div>
+            <div class="l-scroll"><marquee id="live-desc" scrollamount="6">🔴 KDK News లో నిరంతరం తాజా వార్తలు, జాతీయ మరియు అంతర్జాతీయ అప్‌డేట్స్ మీకోసం...</marquee></div>
+          </div>
+        </div>
+    </div>
+
+    <script>
+      const SUPABASE_URL = "https://ujpdnorawpflxbvxipmc.supabase.co";
+      const SUPABASE_KEY = "sb_publishable_rUISPJuEsEYIJqPuWpyEPg_sdmg9xa5";
+      const TIMEZONE = "Asia/Kolkata";
+      const DEFAULT_SCHEDULE = [{ streamingTime: "00:00:00", startTime: 0, endTime: 86400, title: "Breaking News Updates", url: "https://youtu.be/qmbYbrrPxbA?si=z7EEK-OconBXcZac" }];
+      const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+      let PLAYLIST = []; let ytPlayer = null; let playerReady = false; let playlistReady = false;
+      let currentIdx = -1; let nextTimer = null; let isSwitching = false; let seekConfirmed = false; let targetSeek = null; let seekRetryTimer = null;
+
+      function t2s(str) { const p = String(str).split(":").map(Number); return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : 0; }
+      function nowIST() { return new Date(new Date().toLocaleString("en-US", { timeZone: TIMEZONE })); }
+      function nowSec() { const d = nowIST(); return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds(); }
+      function todayStr() { const d = nowIST(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+      function ytId(url) { try { const u = new URL(url); if (u.hostname.includes("youtube.com")) { if (u.pathname.startsWith('/shorts/')) return u.pathname.split('/')[2]; return u.searchParams.get("v"); } if (u.hostname === "youtu.be") return u.pathname.slice(1).split("?")[0]; } catch {} return null; }
+
+      let topNews10 = [], nationalNews10 = [], sportsNews10 = [], currentNewsIdx = 0;
+
+      async function fetchGoogleNews() {
+        try {
+          const fetchFeed = async (query) => {
+            const url = `https://news.google.com/rss/search?q=${query}&hl=te&gl=IN&ceid=IN:te`;
+            const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`);
+            const data = await res.json();
+            if (data && data.items) { return data.items.slice(0, 10).map((item, index) => `${index + 1}. ${item.title.split(' - ')[0]}`); }
+            return [];
+          };
+
+          topNews10 = await fetchFeed('telugu+news');
+          nationalNews10 = await fetchFeed('india+telugu+news');
+          sportsNews10 = await fetchFeed('sports+telugu');
+
+          if(topNews10.length > 0) {
+            document.getElementById('pop-desc').innerHTML = `<span style="color:#fff;">|| టాప్ 10 ముఖ్య వార్తలు ||</span> &nbsp;&nbsp;&nbsp; ` + topNews10.join(" &nbsp;&nbsp;♦&nbsp;&nbsp; ");
+            document.getElementById('google-news-text').innerText = topNews10[0];
+          }
+          updateLiveTicker();
+        } catch(e) {}
+      }
+      
+      setInterval(() => {
+        if(topNews10.length > 0) {
+          currentNewsIdx = (currentNewsIdx + 1) % topNews10.length;
+          document.getElementById('google-news-text').innerText = topNews10[currentNewsIdx];
+        }
+      }, 10000);
+
+      fetchGoogleNews(); setInterval(fetchGoogleNews, 15 * 60000); 
+
+      function updateLiveTicker() {
+        let progTitle = PLAYLIST[currentIdx] ? PLAYLIST[currentIdx].title : "Breaking News Updates";
+        let baseText = `<span style="color:var(--n-yellow);">LIVE PROGRAM: ${progTitle}</span> 🔴 &nbsp;&nbsp;&nbsp;&nbsp;`;
+        let natText = nationalNews10.length > 0 ? `<span style="color:var(--n-yellow);">|| టాప్ 10 జాతీయ వార్తలు ||</span> &nbsp;&nbsp;&nbsp; ` + nationalNews10.join(" &nbsp;&nbsp;♦&nbsp;&nbsp; ") : "";
+        let spoText = sportsNews10.length > 0 ? `<span style="color:var(--n-yellow);">|| టాప్ 10 స్పోర్ట్స్ అప్‌డేట్ ||</span> &nbsp;&nbsp;&nbsp; ` + sportsNews10.join(" &nbsp;&nbsp;♦&nbsp;&nbsp; ") : "";
+        document.getElementById('live-desc').innerHTML = baseText + natText + " &nbsp;&nbsp;&nbsp;&nbsp; " + spoText;
+      }
+
+      function triggerFlashNews() {
+        if(topNews10.length > 0) {
+          const randomHeadline = topNews10[Math.floor(Math.random() * topNews10.length)].replace(/^\d+\.\s*/, '');
+          document.getElementById('flash-headline-text').innerText = randomHeadline;
+          const flashScreen = document.getElementById('flash-screen');
+          flashScreen.classList.add('show');
+          setTimeout(() => flashScreen.classList.remove('show'), 8000); 
+        }
+      }
+      setInterval(triggerFlashNews, 180000); 
+
+      setInterval(()=>{ 
+        const d = nowIST(); 
+        document.getElementById('c-date').innerText = String(d.getDate()).padStart(2,'0') + "-" + String(d.getMonth()+1).padStart(2,'0') + "-" + d.getFullYear();
+        document.getElementById('c-time').innerText = d.toLocaleTimeString('en-US',{hour12:false}); 
+      }, 1000);
+
+      async function fetchOverrides() {
+        try {
+          const { data } = await db.from("kdk_schedules").select("*").eq("scheduled_date", todayStr()).eq("is_played", false).eq("is_active", true).eq("channel", "news").order("streaming_time");
+          return (data || []).map((r) => ({ streamingTime: r.streaming_time, startTime: r.start_time || 0, endTime: r.end_time, title: r.title, url: r.media_url || r.youtube_url, isOverride: true, overrideId: r.id }));
+        } catch (e) { return []; }
+      }
+
+      async function markPlayed(id) { if (!id) return; try { await db.from("kdk_schedules").update({ is_played: true, played_at: new Date().toISOString() }).eq("id", id); } catch {} }
+      function buildPlaylist(overrides) { if (overrides.length > 0) return overrides.sort((a, b) => t2s(a.streamingTime) - t2s(b.streamingTime)); return DEFAULT_SCHEDULE.map((d) => ({ ...d, isOverride: false })); }
+      
+      function stopSeekRetry() { if (seekRetryTimer) { clearInterval(seekRetryTimer); seekRetryTimer = null; } seekConfirmed = false; }
+
+      function playProgram(idx, offset) {
+        if (isSwitching) return; isSwitching = true; stopSeekRetry();
+        if (nextTimer) clearTimeout(nextTimer);
+        if (currentIdx >= 0 && PLAYLIST[currentIdx]?.isOverride) markPlayed(PLAYLIST[currentIdx].overrideId);
+        currentIdx = idx; const prog = PLAYLIST[idx]; const vid = ytId(prog.url);
+        
+        if (!vid) { isSwitching = false; scheduleNext(idx); return; }
+        targetSeek = (prog.isOverride ? 0 : prog.startTime || 0) + Math.floor(offset);
+
+        updateLiveTicker(); 
+
+        if (playerReady) { ytPlayer.loadVideoById({ videoId: vid, startSeconds: targetSeek }); ytPlayer.unMute(); }
+        setTimeout(() => { isSwitching = false; }, 2000); scheduleNext(idx);
+      }
+
+      function startSeekRetry() {
+        stopSeekRetry(); if (targetSeek === null) return;
+        const target = targetSeek; let attempts = 0;
+        seekRetryTimer = setInterval(() => {
+          if (seekConfirmed || targetSeek !== target) { stopSeekRetry(); return; }
+          attempts++; if (attempts > 40) { stopSeekRetry(); return; }
+          const cur = ytPlayer.getCurrentTime ? ytPlayer.getCurrentTime() : 0;
+          if (Math.abs(cur - target) <= 8) { seekConfirmed = true; stopSeekRetry(); return; }
+          ytPlayer.seekTo(target, true);
+        }, 500);
+      }
+
+      function scheduleNext(idx) {
+        if (nextTimer) clearTimeout(nextTimer);
+        const now = nowSec(); const nextIdx = (idx + 1) % PLAYLIST.length; const nextAt = t2s(PLAYLIST[nextIdx].streamingTime);
+        let ms = (nextAt > now) ? (nextAt - now) * 1000 : (nextIdx === 0 ? (86400 - now + nextAt) * 1000 : 5000);
+        nextTimer = setTimeout(() => playProgram(nextIdx, 0), ms + 1500);
+      }
+
+      function findAndPlay() {
+        const now = nowSec(); let idx = 0;
+        for (let i = PLAYLIST.length - 1; i >= 0; i--) { if (t2s(PLAYLIST[i].streamingTime) <= now) { idx = i; break; } }
+        const prog = PLAYLIST[idx]; const dur = prog.endTime - prog.startTime;
+        const elapsed = now >= t2s(prog.streamingTime) ? now - t2s(prog.streamingTime) : now + 86400 - t2s(prog.streamingTime);
+        if (elapsed >= dur) playProgram((idx + 1) % PLAYLIST.length, 0); else playProgram(idx, elapsed);
+      }
+
+      function onYouTubeIframeAPIReady() {
+        ytPlayer = new YT.Player("yt-player", { width: "100%", height: "100%", playerVars: { autoplay: 1, controls: 0, modestbranding: 1, playsinline: 1, disablekb: 1 }, events: { onReady: (e) => { playerReady = true; e.target.mute(); if (playlistReady) findAndPlay(); document.getElementById("mute-cover").style.display = "block"; setInterval(skipYouTubeAds, 1000); }, onStateChange: (e) => { if (e.data === YT.PlayerState.BUFFERING || e.data === YT.PlayerState.PLAYING) { if (targetSeek !== null && !seekConfirmed) startSeekRetry(); } if (e.data === YT.PlayerState.PLAYING && seekConfirmed) stopSeekRetry(); if (e.data === 0 && !isSwitching) { stopSeekRetry(); playProgram((currentIdx + 1) % PLAYLIST.length, 0); } } } });
+      }
+
+      // AUTONOMOUS AD SKIPPER
+      function skipYouTubeAds() {
+          if (!playerReady || !ytPlayer || typeof ytPlayer.getDuration !== 'function') return;
+          try {
+              const iframe = document.querySelector('#yt-wrap iframe');
+              if (iframe && iframe.contentWindow) {
+                  const skipBtn = iframe.contentDocument ? iframe.contentDocument.querySelector('.ytp-ad-skip-button, .video-ad-skip-button') : null;
+                  if (skipBtn) { skipBtn.click(); return; }
+              }
+              if (ytPlayer.getAdState && ytPlayer.getAdState() === 1) {
+                  ytPlayer.seekTo(ytPlayer.getDuration() - 1, true);
+              }
+          } catch (err) {}
+      }
+      
+      function doUnmute() { 
+        ytPlayer.unMute(); 
+        ytPlayer.setVolume(100); 
+        document.getElementById("mute-cover").style.display = "none"; 
+        document.querySelector("#yt-wrap iframe").style.pointerEvents = "auto"; 
+        document.getElementById("tap-shield").style.display = "none"; 
+      }
+      document.getElementById("mute-cover").addEventListener("click", doUnmute); 
+      document.getElementById("tap-shield").addEventListener("click", doUnmute);
+      
+      setTimeout(() => { const lo = document.getElementById("loader"); lo.classList.add("out"); setTimeout(() => (lo.style.display = "none"), 900); }, 3000);
+
+      (async function init() { PLAYLIST = buildPlaylist(await fetchOverrides()); playlistReady = true; if (playerReady) findAndPlay(); })();
+    </script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+  </body>
+</html>
